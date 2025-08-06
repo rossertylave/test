@@ -1,32 +1,32 @@
-name: Build & Push Docker image with Kaniko on Commit
+name: Build & Push Docker image with Kaniko
 
 on:
-  push:  # триггер на кожен коміт у будь-яку гілку
+  push:
     branches:
-      - '**'
+      - '**'  # усі гілки
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    container:
-      image: gcr.io/kaniko-project/executor:debug
-      options: --entrypoint=""
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Configure Docker authentication
+      - name: Set up Docker auth config for GHCR
         run: |
-          mkdir -p /kaniko/.docker
-          echo "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ secrets.GHCR_USERNAME }}\",\"password\":\"${{ secrets.GHCR_TOKEN }}\"}}}" > /kaniko/.docker/config.json
+          mkdir -p /tmp/kaniko/.docker
+          echo "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ secrets.GHCR_USERNAME }}\",\"password\":\"${{ secrets.GHCR_TOKEN }}\"}}}" > /tmp/kaniko/.docker/config.json
 
-      - name: Build and push image with Kaniko
+      - name: Run Kaniko to build and push
         run: |
-          /kaniko/executor \
+          docker run --rm \
+            -v "$(pwd)":/workspace \
+            -v /tmp/kaniko/.docker:/kaniko/.docker \
+            gcr.io/kaniko-project/executor:debug \
             --skip-tls-verify \
+            --context /workspace \
+            --dockerfile /workspace/Dockerfile \
+            --destination ghcr.io/${{ github.repository }}:${{ github.ref_name }} \
             --cache=true \
-            --cache-repo ghcr.io/${{ github.repository }} \
-            --context $GITHUB_WORKSPACE \
-            --dockerfile $GITHUB_WORKSPACE/Dockerfile \
-            --destination ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-
+            --cache-repo ghcr.io/${{ github.repository }}
