@@ -1,32 +1,37 @@
-name: Build & Push Docker image with Kaniko
+name: Build and Push
 
 on:
   push:
-    branches:
-      - '**'  # усі гілки
+    branches: [ main ]
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Set up Docker auth config for GHCR
-        run: |
-          mkdir -p /tmp/kaniko/.docker
-          echo "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ secrets.GHCR_USERNAME }}\",\"password\":\"${{ secrets.GHCR_TOKEN }}\"}}}" > /tmp/kaniko/.docker/config.json
+    # Логін в GitHub Container Registry
+    - name: Log in to GHCR
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.CR_PAT }}
 
-      - name: Run Kaniko to build and push
-        run: |
-          docker run --rm \
-            -v "$(pwd)":/workspace \
-            -v /tmp/kaniko/.docker:/kaniko/.docker \
-            gcr.io/kaniko-project/executor:debug \
-            --skip-tls-verify \
-            --context /workspace \
-            --dockerfile /workspace/Dockerfile \
-            --destination ghcr.io/${{ github.repository }}:${{ github.ref_name }} \
-            --cache=true \
-            --cache-repo ghcr.io/${{ github.repository }}
+    # Запуск kaniko для побудови і пушу образу
+    - name: Build and push Docker image with Kaniko
+      run: |
+        mkdir -p /tmp/kaniko/.docker
+        echo "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.actor }}\",\"password\":\"${{ secrets.CR_PAT }}\"}}}" > /tmp/kaniko/.docker/config.json
+
+        docker run --rm \
+          -v "$(pwd)":/workspace \
+          -v /tmp/kaniko/.docker:/kaniko/.docker \
+          gcr.io/kaniko-project/executor:debug \
+          --skip-tls-verify \
+          --context /workspace \
+          --dockerfile /workspace/Dockerfile \
+          --destination ghcr.io/rossertylave/test:main \
+          --cache=true \
+          --cache-repo ghcr.io/rossertylave/test
