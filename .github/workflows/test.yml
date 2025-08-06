@@ -1,0 +1,39 @@
+# .github/workflows/build-image.yml
+
+name: Build Docker Image with Kaniko
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-image:
+    name: Build with Kaniko
+    runs-on: ubuntu-latest
+    container:
+      image: gcr.io/kaniko-project/executor:debug
+      options: --entrypoint=""
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Docker auth for Kaniko
+        run: |
+          mkdir -p /kaniko/.docker
+          echo "{\"auths\":{\"${{ env.CI_REGISTRY }}\":{\"username\":\"${{ secrets.CI_REGISTRY_USER }}\",\"password\":\"${{ secrets.CI_REGISTRY_PASSWORD }}\"}}}" > /kaniko/.docker/config.json
+
+      - name: Build image with Kaniko (no push)
+        run: |
+          /kaniko/executor \
+            --skip-tls-verify \
+            --cache=true \
+            --cache-repo ${{ env.CI_REGISTRY_IMAGE }} \
+            --no-push \
+            --context $GITHUB_WORKSPACE \
+            --dockerfile $GITHUB_WORKSPACE/Dockerfile \
+            --destination ${{ env.CI_REGISTRY_IMAGE }}:${{ github.ref_name }}
+
+    env:
+      CI_REGISTRY: ghcr.io
+      CI_REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
